@@ -1,0 +1,70 @@
+version: '3.9'
+
+services:
+  django: &django
+    build:
+      context: .
+      dockerfile: ./compose/local/django/Dockerfile
+    image: news_feed_bookmarks_local_django
+    container_name: news_feed_bookmarks_local_django
+    platform: linux/x86_64
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - .:/app:z
+    env_file:
+      - .envs/.local/.django
+    ports:
+      - "8080:8000"
+    command: /start
+    stdin_open: true
+    tty: true
+
+  mysql:
+    image: mysql:5.7.31
+    container_name: news_feed_bookmarks_local_mysql
+    environment:
+      MYSQL_AUTHENTICATION_PLUGIN: mysql_native_password
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: news_feed_bookmarks
+      MYSQL_USER: dev_usr
+      MYSQL_PASSWORD: password
+    volumes:
+      - news_feed_bookmarks_local_mysql_data:/var/lib/mysql:z
+
+  redis:
+    image: redis:6
+    container_name: news_feed_bookmarks_local_redis
+
+  celeryworker:
+    <<: *django
+    image: news_feed_bookmarks_local_celeryworker
+    container_name: news_feed_bookmarks_local_celeryworker
+    depends_on:
+      - redis
+      - mysql
+    ports: []
+    command: /start-celeryworker
+
+  celerybeat:
+    <<: *django
+    image: news_feed_bookmarks_local_celerybeat
+    container_name: news_feed_bookmarks_local_celerybeat
+    depends_on:
+      - django  # due to dependency on migrations
+      - redis
+      - mysql
+    ports: [ ]
+    command: /start-celerybeat
+
+  flower:
+    <<: *django
+    image: news_feed_bookmarks_local_flower
+    container_name: news_feed_bookmarks_local_flower
+    ports:
+      - "5557:5555"
+    command: /start-flower
+
+volumes:
+  news_feed_bookmarks_local_mysql_data: {}
